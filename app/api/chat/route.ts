@@ -57,9 +57,9 @@ export async function POST(req: Request) {
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini error:", data);
+      console.error("Gemini error:", JSON.stringify(data));
       return NextResponse.json(
-        { reply: "Something went wrong. Try again." },
+        { reply: `API error: ${data?.error?.message || JSON.stringify(data)}` },
         { status: response.status }
       );
     }
