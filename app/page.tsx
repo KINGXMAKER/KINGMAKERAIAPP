@@ -47,17 +47,17 @@ const MODES = [
   },
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const MAX_FILE_SIZE = 25 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp", "video/mp4", "video/quicktime", "video/webm"];
 
 function processFile(file: File): Promise<ChatImage> {
   return new Promise((resolve, reject) => {
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      reject(new Error(`${file.type} not supported. Use JPG, PNG, GIF, or WebP.`));
+      reject(new Error(`${file.type} not supported. Use JPG, PNG, GIF, WebP, MP4, MOV, or WebM.`));
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      reject(new Error("File too big. Keep it under 10MB."));
+      reject(new Error("File too big. Keep it under 25MB."));
       return;
     }
     const reader = new FileReader();
@@ -405,17 +405,29 @@ export default function KingMakerAI() {
                 <div style={{
                   display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap",
                 }}>
-                  {msg.images.map((img, j) => (
-                    <img
-                      key={j}
-                      src={img.preview}
-                      alt={`Upload ${j + 1}`}
-                      style={{
-                        maxWidth: "200px", maxHeight: "200px",
-                        borderRadius: "10px", objectFit: "cover",
-                      }}
-                    />
-                  ))}
+                  {msg.images.map((img, j) =>
+                    img.mimeType.startsWith("video/") ? (
+                      <video
+                        key={j}
+                        src={img.preview}
+                        controls
+                        style={{
+                          maxWidth: "200px", maxHeight: "200px",
+                          borderRadius: "10px", objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <img
+                        key={j}
+                        src={img.preview}
+                        alt={`Upload ${j + 1}`}
+                        style={{
+                          maxWidth: "200px", maxHeight: "200px",
+                          borderRadius: "10px", objectFit: "cover",
+                        }}
+                      />
+                    )
+                  )}
                 </div>
               )}
 
@@ -429,7 +441,7 @@ export default function KingMakerAI() {
               ) : msg.content ? (
                 msg.content
               ) : msg.images && msg.images.length > 0 ? (
-                <em style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>Sent a photo</em>
+                <em style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>Sent media</em>
               ) : (
                 msg.content
               )}
@@ -473,14 +485,24 @@ export default function KingMakerAI() {
           }}>
             {pendingImages.map((img, i) => (
               <div key={i} style={{ position: "relative" }}>
-                <img
-                  src={img.preview}
-                  alt={`Upload ${i + 1}`}
-                  style={{
-                    width: "56px", height: "56px", objectFit: "cover",
-                    borderRadius: "8px", border: "1px solid rgba(255,20,147,0.4)",
-                  }}
-                />
+                {img.mimeType.startsWith("video/") ? (
+                  <video
+                    src={img.preview}
+                    style={{
+                      width: "56px", height: "56px", objectFit: "cover",
+                      borderRadius: "8px", border: "1px solid rgba(255,20,147,0.4)",
+                    }}
+                  />
+                ) : (
+                  <img
+                    src={img.preview}
+                    alt={`Upload ${i + 1}`}
+                    style={{
+                      width: "56px", height: "56px", objectFit: "cover",
+                      borderRadius: "8px", border: "1px solid rgba(255,20,147,0.4)",
+                    }}
+                  />
+                )}
                 <button
                   onClick={() => setPendingImages((prev) => prev.filter((_, j) => j !== i))}
                   style={{
@@ -552,8 +574,7 @@ export default function KingMakerAI() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/gif,image/webp"
-        capture="environment"
+        accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,video/webm"
         multiple
         style={{ display: "none" }}
         onChange={(e) => {
