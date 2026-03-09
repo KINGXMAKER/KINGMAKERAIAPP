@@ -2,25 +2,17 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 
-const SYSTEM_PROMPT = `You are the BBO Creator Coach — a smart, real friend who helps people figure out their next move with their brand, content, or money.
+interface ChatImage {
+  base64: string;
+  mimeType: string;
+  preview: string;
+}
 
-The person talking to you is probably new to this. They might not know business terms. They just know they want MORE — more followers, more money, more clarity.
-
-How you talk:
-- Like a smart friend giving advice over text. Keep it casual.
-- Short sentences. Easy words. No business jargon.
-- Never say: "leverage," "optimize," "monetize," "scale," "brand equity," "value proposition," "target audience," "niche down," "content strategy," "algorithm"
-- Instead say: "post more of what's working," "the people who follow you," "what makes you different," "how to get paid from this"
-- Use **bold** for the important parts so it's easy to skim
-- Use bullet points when listing things out
-- Be encouraging but honest. Don't gas them up with no substance.
-
-When someone asks you something:
-1. Ask 1-2 simple follow-up questions first so you actually understand their situation
-2. Give them ONE clear thing to do — not a whole plan
-3. Explain it like you're texting your friend who's smart but has never done this before
-
-Keep it short. 3-5 sentences unless they really need more. End with a question or a simple next step they can do TODAY.`;
+interface ChatMessage {
+  role: string;
+  content: string;
+  images?: ChatImage[];
+}
 
 const MODES = [
   {
@@ -47,9 +39,39 @@ const MODES = [
     description: "Is my stuff good?",
     prompt: "Can you give me honest feedback on my page and content? Ask me about what I post and how my page looks, then tell me what I should change.",
   },
+  {
+    label: "Vibe Check",
+    icon: "📸",
+    description: "Send a fit pic, get songs + captions",
+    prompt: "",
+  },
 ];
 
-// Styles extracted to reduce JSX clutter
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+function processFile(file: File): Promise<ChatImage> {
+  return new Promise((resolve, reject) => {
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      reject(new Error(`${file.type} not supported. Use JPG, PNG, GIF, or WebP.`));
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      reject(new Error("File too big. Keep it under 10MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const base64 = dataUrl.split(",")[1];
+      resolve({ base64, mimeType: file.type, preview: dataUrl });
+    };
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Styles
 const styles = {
   container: {
     minHeight: "100vh",
@@ -142,40 +164,97 @@ const styles = {
 };
 
 export default function KingMakerAI() {
-  const [messages, setMessages] = useState<{ role: string; content: string }[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingImages, setPendingImages] = useState<ChatImage[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Persist last conversation in localStorage
+  // Load saved messages (text only — images not persisted)
   useEffect(() => {
     const saved = localStorage.getItem("km-messages");
     if (saved) {
-      try { setMessages(JSON.parse(saved)); } catch {}
+      try { setMessages(JSON.parse(saved)); } catch { /* ignore */ }
     }
   }, []);
 
+  // Save messages (strip images to avoid localStorage overflow)
   useEffect(() => {
     if (messages.length > 0) {
-      localStorage.setItem("km-messages", JSON.stringify(messages));
+      const lite = messages.map(({ role, content }) => ({ role, content }));
+      localStorage.setItem("km-messages", JSON.stringify(lite));
     }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  async function handleFiles(files: FileList | File[]) {
+    const fileArray = Array.from(files).slice(0, 5);
+    try {
+      const processed = await Promise.all(fileArray.map(processFile));
+      setPendingImages((prev) => [...prev, ...processed].slice(0, 5));
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Couldn't process that file.");
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter((item) => item.type.startsWith("image/"));
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      const files = imageItems.map((item) => item.getAsFile()).filter(Boolean) as File[];
+      handleFiles(files);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
+  }
+
   async function sendMessage(text?: string) {
     const userText = text || input.trim();
-    if (!userText || loading) return;
+    if ((!userText && pendingImages.length === 0) || loading) return;
     setInput("");
 
-    const newMessages = [...messages, { role: "user", content: userText }];
+    const newMessage: ChatMessage = {
+      role: "user",
+      content: userText,
+      images: pendingImages.length > 0 ? [...pendingImages] : undefined,
+    };
+    setPendingImages([]);
+
+    const newMessages = [...messages, newMessage];
     setMessages(newMessages);
     setLoading(true);
 
     try {
+      // Strip preview URLs before sending to API
+      const apiMessages = newMessages.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        images: msg.images?.map(({ base64, mimeType }) => ({ base64, mimeType })),
+      }));
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: apiMessages }),
       });
       const data = await response.json();
       setMessages([...newMessages, { role: "assistant", content: data.reply }]);
@@ -187,14 +266,39 @@ export default function KingMakerAI() {
 
   function clearChat() {
     setMessages([]);
+    setPendingImages([]);
     localStorage.removeItem("km-messages");
   }
 
-  const sendDisabled = loading || !input.trim();
+  const sendDisabled = loading || (!input.trim() && pendingImages.length === 0);
 
   return (
-    <div style={styles.container}>
+    <div
+      style={styles.container}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet" />
+
+      {/* Drag overlay */}
+      {isDragging && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 100,
+          background: "rgba(0,0,0,0.85)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          border: "3px dashed #ff1493",
+          pointerEvents: "none",
+        }}>
+          <div style={{
+            color: "#ff1493", fontSize: "24px",
+            fontFamily: "'Bebas Neue', sans-serif",
+            letterSpacing: "3px",
+          }}>
+            DROP YOUR PHOTO
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={styles.header}>
@@ -214,10 +318,7 @@ export default function KingMakerAI() {
       <div style={styles.chatArea}>
         {messages.length === 0 && (
           <div style={{ animation: "fadeIn 0.6s ease" }}>
-            {/* Welcome */}
-            <div style={{
-              textAlign: "center", padding: "20px 0 30px",
-            }}>
+            <div style={{ textAlign: "center", padding: "20px 0 30px" }}>
               <p style={{ color: "#888", fontSize: "15px", lineHeight: 1.7, maxWidth: "480px", margin: "0 auto" }}>
                 Like having a smart friend who knows about content and money.
                 Tap a button or type your question.
@@ -232,25 +333,44 @@ export default function KingMakerAI() {
               marginBottom: "16px",
             }}>
               {MODES.map((mode, i) => (
-                <button key={i} onClick={() => sendMessage(mode.prompt)} style={{
-                  background: "rgba(255,20,147,0.06)",
-                  border: "1px solid rgba(255,20,147,0.2)",
-                  borderRadius: "12px",
-                  padding: "16px 14px",
-                  color: "#ccc",
-                  fontSize: "13px",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
+                <button
+                  key={i}
+                  onClick={() => {
+                    if (mode.label === "Vibe Check") {
+                      fileInputRef.current?.click();
+                    } else {
+                      sendMessage(mode.prompt);
+                    }
+                  }}
+                  style={{
+                    background: mode.label === "Vibe Check"
+                      ? "rgba(255,20,147,0.12)"
+                      : "rgba(255,20,147,0.06)",
+                    border: mode.label === "Vibe Check"
+                      ? "1px solid rgba(255,20,147,0.5)"
+                      : "1px solid rgba(255,20,147,0.2)",
+                    borderRadius: "12px",
+                    padding: "16px 14px",
+                    color: "#ccc",
+                    fontSize: "13px",
+                    textAlign: "left",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    ...(i === MODES.length - 1 && MODES.length % 2 !== 0
+                      ? { gridColumn: "1 / -1" }
+                      : {}),
+                  }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.background = "rgba(255,20,147,0.12)";
                     (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,20,147,0.5)";
                   }}
                   onMouseLeave={e => {
-                    (e.currentTarget as HTMLElement).style.background = "rgba(255,20,147,0.06)";
-                    (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,20,147,0.2)";
-                  }}>
+                    (e.currentTarget as HTMLElement).style.background =
+                      mode.label === "Vibe Check" ? "rgba(255,20,147,0.12)" : "rgba(255,20,147,0.06)";
+                    (e.currentTarget as HTMLElement).style.borderColor =
+                      mode.label === "Vibe Check" ? "rgba(255,20,147,0.5)" : "rgba(255,20,147,0.2)";
+                  }}
+                >
                   <div style={{ fontSize: "22px", marginBottom: "6px" }}>{mode.icon}</div>
                   <div style={{ fontWeight: 700, color: "#fff", marginBottom: "4px" }}>{mode.label}</div>
                   <div style={{ fontSize: "12px", color: "#666" }}>{mode.description}</div>
@@ -280,10 +400,36 @@ export default function KingMakerAI() {
               fontSize: "14px",
               lineHeight: 1.65,
             }}>
+              {/* Uploaded images */}
+              {msg.images && msg.images.length > 0 && (
+                <div style={{
+                  display: "flex", gap: "6px", marginBottom: "8px", flexWrap: "wrap",
+                }}>
+                  {msg.images.map((img, j) => (
+                    <img
+                      key={j}
+                      src={img.preview}
+                      alt={`Upload ${j + 1}`}
+                      style={{
+                        maxWidth: "200px", maxHeight: "200px",
+                        borderRadius: "10px", objectFit: "cover",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Text content */}
               {msg.role === "assistant" ? (
                 <div className="md-content"><ReactMarkdown>{msg.content}</ReactMarkdown></div>
               ) : msg.content.length > 100 ? (
-                <em style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>Started: {MODES.find(m => m.prompt === msg.content)?.label || "Custom question"}</em>
+                <em style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>
+                  Started: {MODES.find(m => m.prompt === msg.content)?.label || "Custom question"}
+                </em>
+              ) : msg.content ? (
+                msg.content
+              ) : msg.images && msg.images.length > 0 ? (
+                <em style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}>Sent a photo</em>
               ) : (
                 msg.content
               )}
@@ -316,12 +462,68 @@ export default function KingMakerAI() {
 
       {/* Input */}
       <div style={styles.inputArea}>
-        <div style={styles.inputBox}>
+        {/* Pending image previews */}
+        {pendingImages.length > 0 && (
+          <div style={{
+            display: "flex", gap: "8px", padding: "10px 14px",
+            background: "rgba(255,255,255,0.03)",
+            borderRadius: "12px 12px 0 0",
+            border: "1px solid rgba(255,20,147,0.2)",
+            borderBottom: "none",
+          }}>
+            {pendingImages.map((img, i) => (
+              <div key={i} style={{ position: "relative" }}>
+                <img
+                  src={img.preview}
+                  alt={`Upload ${i + 1}`}
+                  style={{
+                    width: "56px", height: "56px", objectFit: "cover",
+                    borderRadius: "8px", border: "1px solid rgba(255,20,147,0.4)",
+                  }}
+                />
+                <button
+                  onClick={() => setPendingImages((prev) => prev.filter((_, j) => j !== i))}
+                  style={{
+                    position: "absolute", top: "-6px", right: "-6px",
+                    width: "18px", height: "18px", borderRadius: "50%",
+                    background: "#ff1493", border: "none", color: "#fff",
+                    fontSize: "10px", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                >x</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{
+          ...styles.inputBox,
+          ...(pendingImages.length > 0 ? { borderRadius: "0 0 14px 14px" } : {}),
+        }}>
+          {/* Upload button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: "18px", color: "#ff1493", flexShrink: 0,
+              padding: "0", width: "34px", height: "34px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: 0.7, transition: "opacity 0.2s",
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.opacity = "1"; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.opacity = "0.7"; }}
+            title="Upload photo"
+          >
+            📎
+          </button>
+
           <textarea
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="What's your move?"
+            onPaste={handlePaste}
+            placeholder={pendingImages.length > 0 ? "Add a message or just hit send..." : "What's your move?"}
             rows={1}
             style={styles.textarea}
           />
@@ -345,6 +547,20 @@ export default function KingMakerAI() {
           @DABBOSHOW · BBO Universe
         </p>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        capture="environment"
+        multiple
+        style={{ display: "none" }}
+        onChange={(e) => {
+          if (e.target.files) handleFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
