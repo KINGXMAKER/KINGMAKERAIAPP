@@ -32,28 +32,28 @@ Remember: the person asking is likely a creator or entrepreneur early in their j
 
 const MODES = [
   {
-    label: "Audit My Hustle",
-    icon: "🔍",
-    description: "Find what's actually holding you back",
-    prompt: "I want you to audit my hustle. Ask me 3 sharp questions to figure out where I'm stuck, then tell me my #1 bottleneck and the highest-leverage move I should make.",
+    label: "I'm Stuck",
+    icon: "😩",
+    description: "I don't know what to do next",
+    prompt: "I feel stuck right now and I'm not sure what my next move should be. Ask me a few questions about what I've got going on, then tell me the ONE thing I should focus on right now.",
   },
   {
-    label: "Scale My Content",
+    label: "Get Followers",
     icon: "📱",
-    description: "Turn posts into a real system",
-    prompt: "I'm creating content but it's not turning into real growth or money. Help me build a content system that compounds. Ask me what I'm posting and where, then give me a strategy.",
+    description: "Grow my page for real",
+    prompt: "I want to grow my following but nothing seems to be working. Ask me what kind of content I make and where I post, then give me a simple plan to actually start growing.",
   },
   {
-    label: "Event Money",
-    icon: "🎤",
-    description: "Make live events actually profitable",
-    prompt: "I want to throw events that actually make money — not just look cool. Walk me through how to structure, price, and monetize a live event in my niche.",
-  },
-  {
-    label: "Monetize This",
+    label: "Make Money",
     icon: "💰",
-    description: "Turn your thing into income",
-    prompt: "I have skills and a following but I'm not making real money from it yet. Help me figure out the fastest path to monetization. Ask me what I've got to work with.",
+    description: "I need to start getting paid",
+    prompt: "I want to make money from what I do but I don't know where to start. Ask me about my skills and what I'm already doing, then show me the easiest way to start earning.",
+  },
+  {
+    label: "Brand Check",
+    icon: "🪞",
+    description: "Am I doing this right?",
+    prompt: "I want an honest check on my brand. Ask me about my name, my content, and how I show up online, then tell me what's working, what's not, and what I should fix first.",
   },
 ];
 
@@ -227,8 +227,8 @@ export default function KingMakerAI() {
               textAlign: "center", padding: "20px 0 30px",
             }}>
               <p style={{ color: "#888", fontSize: "15px", lineHeight: 1.7, maxWidth: "480px", margin: "0 auto" }}>
-                I help creators and entrepreneurs find their highest-leverage move.
-                Pick a mode or ask me anything.
+                Think of me as your free strategy coach.
+                Tap a button or just ask me anything.
               </p>
             </div>
 
