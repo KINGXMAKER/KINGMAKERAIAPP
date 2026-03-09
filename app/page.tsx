@@ -2,58 +2,50 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
 
-const SYSTEM_PROMPT = `You are King Maker AI — the strategic mind behind Bad Bitches Only (BBO).
+const SYSTEM_PROMPT = `You are the BBO Creator Coach — a smart, real friend who helps people figure out their next move with their brand, content, or money.
 
-You think in systems, leverage, and incentives. You help creators, entrepreneurs, and culture-builders scale without grinding themselves into the ground.
+The person talking to you is probably new to this. They might not know business terms. They just know they want MORE — more followers, more money, more clarity.
 
-Your mental models:
-- Leverage over labor: Always ask "how do I make this work once and benefit forever?"
-- Systems thinking: See the whole board. Every move should compound.
-- Incentive alignment: People do what they're rewarded for. Design your structure accordingly.
-- Social capital as currency: Relationships and endorsements are balance sheet assets.
-- Monetization before audience: Retention infrastructure beats raw follower count.
+How you talk:
+- Like a smart friend giving advice over text. Keep it casual.
+- Short sentences. Easy words. No business jargon.
+- Never say: "leverage," "optimize," "monetize," "scale," "brand equity," "value proposition," "target audience," "niche down," "content strategy," "algorithm"
+- Instead say: "post more of what's working," "the people who follow you," "what makes you different," "how to get paid from this"
+- Use **bold** for the important parts so it's easy to skim
+- Use bullet points when listing things out
+- Be encouraging but honest. Don't gas them up with no substance.
 
-Your tone:
-- Sharp, direct, no fluff. Short punchy sentences.
-- Culturally fluent — you understand nightlife, media, and creator economy.
-- Never preachy. Never boss-babe energy. Never say "empowerment" or "slay queen."
-- You ask the right question more than you give the obvious answer.
-- Light use of caps for emphasis. Occasional: "clock it," "be fr," "certified," "motion."
-- Use **bold** and bullet points to structure your responses for easy scanning.
+When someone asks you something:
+1. Ask 1-2 simple follow-up questions first so you actually understand their situation
+2. Give them ONE clear thing to do — not a whole plan
+3. Explain it like you're texting your friend who's smart but has never done this before
 
-When someone brings you a problem:
-1. Identify the REAL bottleneck (not the surface problem)
-2. Find the highest-leverage move
-3. Give a concrete next action, not vague strategy
-
-Keep responses concise — 3-5 sentences max unless the question genuinely needs more. End with either a sharp insight, a question that reframes, or a single next move.
-
-Remember: the person asking is likely a creator or entrepreneur early in their journey. Be direct but not dismissive. Meet them where they are, then elevate.`;
+Keep it short. 3-5 sentences unless they really need more. End with a question or a simple next step they can do TODAY.`;
 
 const MODES = [
   {
-    label: "I'm Stuck",
+    label: "I'm Lost",
     icon: "😩",
-    description: "I don't know what to do next",
-    prompt: "I feel stuck right now and I'm not sure what my next move should be. Ask me a few questions about what I've got going on, then tell me the ONE thing I should focus on right now.",
+    description: "I don't know where to start",
+    prompt: "I want to do something with my page or my brand but I honestly don't know where to start. Can you ask me a couple questions and help me figure out my next step?",
   },
   {
-    label: "Get Followers",
+    label: "More Followers",
     icon: "📱",
-    description: "Grow my page for real",
-    prompt: "I want to grow my following but nothing seems to be working. Ask me what kind of content I make and where I post, then give me a simple plan to actually start growing.",
+    description: "How do I grow my page?",
+    prompt: "I want more followers but I don't know what I'm doing wrong. Can you ask me what I post and help me figure out what to do differently?",
   },
   {
-    label: "Make Money",
+    label: "Get Paid",
     icon: "💰",
-    description: "I need to start getting paid",
-    prompt: "I want to make money from what I do but I don't know where to start. Ask me about my skills and what I'm already doing, then show me the easiest way to start earning.",
+    description: "How do I make money from this?",
+    prompt: "I have a page and I post content but I'm not making any money from it. Can you help me figure out how to start getting paid? Ask me what I do first.",
   },
   {
-    label: "Brand Check",
-    icon: "🪞",
-    description: "Am I doing this right?",
-    prompt: "I want an honest check on my brand. Ask me about my name, my content, and how I show up online, then tell me what's working, what's not, and what I should fix first.",
+    label: "Check My Page",
+    icon: "👀",
+    description: "Is my stuff good?",
+    prompt: "Can you give me honest feedback on my page and content? Ask me about what I post and how my page looks, then tell me what I should change.",
   },
 ];
 
@@ -207,8 +199,8 @@ export default function KingMakerAI() {
       {/* Header */}
       <div style={styles.header}>
         <div style={styles.brandTag}>BAD B*TCHES ONLY</div>
-        <h1 style={styles.title}>KING MAKER AI</h1>
-        <p style={styles.subtitle}>Your strategic coach. No fluff. Just moves.</p>
+        <h1 style={styles.title}>BBO CREATOR APP</h1>
+        <p style={styles.subtitle}>Ask me anything about growing your page or getting paid.</p>
         {messages.length > 0 && (
           <button onClick={clearChat} style={{
             background: "none", border: "1px solid rgba(255,20,147,0.3)",
@@ -227,8 +219,8 @@ export default function KingMakerAI() {
               textAlign: "center", padding: "20px 0 30px",
             }}>
               <p style={{ color: "#888", fontSize: "15px", lineHeight: 1.7, maxWidth: "480px", margin: "0 auto" }}>
-                Think of me as your free strategy coach.
-                Tap a button or just ask me anything.
+                Like having a smart friend who knows about content and money.
+                Tap a button or type your question.
               </p>
             </div>
 
